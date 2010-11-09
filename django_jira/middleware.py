@@ -22,6 +22,7 @@ class JiraExceptionReporterMiddleware:
         # Silently fail if any settings are missing
         try:
             settings.JIRA_ISSUE_DEFAULTS
+            settings.JIRA_REOPEN_CLOSED
             
             # Set up SOAP
             self._soap = suds.client.Client(settings.JIRA_URL + 'rpc/soap/jirasoapservice-v2?wsdl')        
@@ -34,18 +35,41 @@ class JiraExceptionReporterMiddleware:
     
     def process_exception(self, request, exc):
         
+        # This parses the traceback - so we can get the name of the function
+        # which generated this exception
+        exc_tb = traceback.extract_tb(sys.exc_info()[2], 1)
         
-        # See if this exception has already been reported inside JIRA, and is
-        # currently an open issue
+        # Build our issue title in the form "ExceptionType thrown by function name"
+        issue_title = type(exc).__name__ + ' thrown by ' + exc_tb[0][2]
+        issue_message = exc.message + '\n\n' \
+                        '{noformat:title=Traceback}\n' + traceback.format_exc() + '\n{noformat}\n\n' + \
+                        '{noformat:title=Request}\n' + repr(request) + '\n{noformat}'
+        
+        # See if this exception has already been reported inside JIRA
+        existing = self._soap.service.getIssuesFromJqlSearch(self._auth,
+                                                             'project = "' + settings.JIRA_ISSUE_DEFAULTS['project'] + '" AND summary ~ "' + issue_title + '"',
+                                                             1)
         
         # If it has, add a comment noting that we've had another report of it
+        if len(existing):
+            
+            issue = existing[0]
+            
+            # If this issue is closed, reopen it
+            if issue.status in settings.JIRA_REOPEN_CLOSED:
+                self._soap.service.progressWorkflowAction(self._auth, issue.key, settings.JIRA_REOPEN_ACTION, ())
+            
+            # Add a comment
+            self._soap.service.addComment(self._auth, issue.key, {
+                'body': issue_message
+            })
+            
+            
+        else:
+            # Otherwise, create it
+            issue = settings.JIRA_ISSUE_DEFAULTS.copy()
+            issue['summary'] = issue_title
+            issue['description'] = issue_message
         
-        # Otherwise, create it
-        issue = settings.JIRA_ISSUE_DEFAULTS.copy()
-        print exc
-        issue['summary'] = traceback.format_exception_only(type(exc), exc)[0]
-        issue['description'] = '{noformat:title=Traceback}\n' + traceback.format_exc() + '\n{noformat}\n\n' + \
-                               '{noformat:title=Request}\n' + repr(request) + '\n{noformat}'
-        
-        print self._soap.service.createIssue(self._auth, issue)
+            self._soap.service.createIssue(self._auth, issue)
         
