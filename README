@@ -1,0 +1,36 @@
+django-jira is some Django middleware that will automatically create an
+issue in a JIRA instance when an exception occurs. It handles duplicate
+exceptions by adding comments to the first instance of that exception.
+
+Requires: SOAPpy
+
+To install, run:
+
+    python setup.py install
+
+Then add:
+
+    django_jira.middleware.JiraExceptionReporterMiddleware
+
+to your MIDDLEWARE_CLASSES in settings.py, along with the appropriate settings
+from the list below.
+
+Settings for Django
+-------------------
+
+JIRA_URL = A URL with trailing slash to the JIRA install
+           (e.g., http://www.example.com/jira/)
+
+JIRA_USER = The username of the user to log in to JIRA as
+
+JIRA_PASSWORD = The password of the user to log in to JIRA as
+
+JIRA_ISSUE_DEFAULTS = A dictionary of the settings to use when creating a JIRA
+                      issue, e.g.,
+    {
+        'project': 'PROJ', # The project code inside JIRA
+        'type':    1       # The ID of the issue type to be created. 1 = Bug
+    }
+
+JIRA_REPORT_IN_DEBUG = If set to True, then JIRA will report even if in DEBUG
+                       mode, by default it does not.
