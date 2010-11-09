@@ -1,9 +1,10 @@
 import traceback
 import hashlib
+import sys
 
 from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
-import SOAPpy
+import suds.client
 
 class JiraExceptionReporterMiddleware:
     
@@ -23,10 +24,10 @@ class JiraExceptionReporterMiddleware:
             settings.JIRA_ISSUE_DEFAULTS
             
             # Set up SOAP
-            self._soap = SOAPpy.WSDL.Proxy(settings.JIRA_URL + 'rpc/soap/jirasoapservice-v2?wsdl')        
+            self._soap = suds.client.Client(settings.JIRA_URL + 'rpc/soap/jirasoapservice-v2?wsdl')        
             
             # Authenticate
-            self._auth = self._soap.login(JIRA_USER, JIRA_PASSWORD)
+            self._auth = self._soap.service.login(settings.JIRA_USER, settings.JIRA_PASSWORD)
         
         except AttributeError:
             raise MiddlewareNotUsed
@@ -41,8 +42,10 @@ class JiraExceptionReporterMiddleware:
         
         # Otherwise, create it
         issue = settings.JIRA_ISSUE_DEFAULTS.copy()
-        issue['summary'] = traceback.format_exception_only(type(exc))[0]
-        issue['description'] = traceback.format_exc()
+        print exc
+        issue['summary'] = traceback.format_exception_only(type(exc), exc)[0]
+        issue['description'] = '{noformat:title=Traceback}\n' + traceback.format_exc() + '\n{noformat}\n\n' + \
+                               '{noformat:title=Request}\n' + repr(request) + '\n{noformat}'
         
-        self._soap.createIssue(self._auth, issue)
+        print self._soap.service.createIssue(self._auth, issue)
         
