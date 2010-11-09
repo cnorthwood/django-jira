@@ -2,7 +2,7 @@ django-jira is some Django middleware that will automatically create an
 issue in a JIRA instance when an exception occurs. It handles duplicate
 exceptions by adding comments to the first instance of that exception.
 
-Requires: SOAPpy
+Requires: suds
 
 To install, run:
 
