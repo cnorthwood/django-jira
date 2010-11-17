@@ -1,6 +1,7 @@
 import traceback
 import hashlib
 import sys
+import re
 
 from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
@@ -40,7 +41,7 @@ class JiraExceptionReporterMiddleware:
         exc_tb = traceback.extract_tb(sys.exc_info()[2], 1)
         
         # Build our issue title in the form "ExceptionType thrown by function name"
-        issue_title = type(exc).__name__ + ' thrown by ' + exc_tb[0][2]
+        issue_title = re.sub(r'"', r'\\\"', type(exc).__name__ + ' thrown by ' + exc_tb[-1][2])
         issue_message = exc.message + '\n\n' \
                         '{noformat:title=Traceback}\n' + traceback.format_exc() + '\n{noformat}\n\n' + \
                         '{noformat:title=Request}\n' + repr(request) + '\n{noformat}'
@@ -51,21 +52,23 @@ class JiraExceptionReporterMiddleware:
                                                              1)
         
         # If it has, add a comment noting that we've had another report of it
-        if len(existing):
+        found = False
+        for issue in existing:
+            if issue_title == issue.summary:
             
-            issue = existing[0]
-            
-            # If this issue is closed, reopen it
-            if issue.status in settings.JIRA_REOPEN_CLOSED:
-                self._soap.service.progressWorkflowAction(self._auth, issue.key, settings.JIRA_REOPEN_ACTION, ())
-            
-            # Add a comment
-            self._soap.service.addComment(self._auth, issue.key, {
-                'body': issue_message
-            })
-            
-            
-        else:
+                # If this issue is closed, reopen it
+                if issue.status in settings.JIRA_REOPEN_CLOSED:
+                    self._soap.service.progressWorkflowAction(self._auth, issue.key, settings.JIRA_REOPEN_ACTION, ())
+                
+                # Add a comment
+                self._soap.service.addComment(self._auth, issue.key, {
+                    'body': issue_message
+                })
+                
+                found = True
+                break
+        
+        if not found:
             # Otherwise, create it
             issue = settings.JIRA_ISSUE_DEFAULTS.copy()
             issue['summary'] = issue_title
