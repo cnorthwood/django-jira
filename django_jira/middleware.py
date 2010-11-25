@@ -5,6 +5,7 @@ import re
 
 from django.conf import settings
 from django.core.exceptions import MiddlewareNotUsed
+
 import suds.client
 
 class JiraExceptionReporterMiddleware:
@@ -36,13 +37,17 @@ class JiraExceptionReporterMiddleware:
     
     def process_exception(self, request, exc):
         
+        # Don't log 404 errors
+        if isinstance(exception, Http404):
+            return
+        
         # This parses the traceback - so we can get the name of the function
         # which generated this exception
         exc_tb = traceback.extract_tb(sys.exc_info()[2])
         
         # Build our issue title in the form "ExceptionType thrown by function name"
         issue_title = re.sub(r'"', r'\\\"', type(exc).__name__ + ' thrown by ' + exc_tb[-1][2])
-        issue_message = exc.message + '\n\n' \
+        issue_message = repr(exc.message) + '\n\n' + \
                         '{noformat:title=Traceback}\n' + traceback.format_exc() + '\n{noformat}\n\n' + \
                         '{noformat:title=Request}\n' + repr(request) + '\n{noformat}'
         
