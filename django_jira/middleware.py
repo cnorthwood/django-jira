@@ -4,6 +4,7 @@ import sys
 import re
 
 from django.conf import settings
+from django.http import Http404
 from django.core.exceptions import MiddlewareNotUsed
 
 import suds.client
@@ -38,7 +39,7 @@ class JiraExceptionReporterMiddleware:
     def process_exception(self, request, exc):
         
         # Don't log 404 errors
-        if isinstance(exception, Http404):
+        if isinstance(exc, Http404):
             return
         
         # This parses the traceback - so we can get the name of the function
