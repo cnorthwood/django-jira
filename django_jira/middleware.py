@@ -7,6 +7,7 @@ from django.conf import settings
 from django.http import Http404
 from django.core.exceptions import MiddlewareNotUsed
 
+from suds import WebFault
 import suds.client
 
 class JiraExceptionReporterMiddleware:
@@ -53,9 +54,20 @@ class JiraExceptionReporterMiddleware:
                         '{noformat:title=Request}\n' + repr(request) + '\n{noformat}'
         
         # See if this exception has already been reported inside JIRA
-        existing = self._soap.service.getIssuesFromJqlSearch(self._auth,
-                                                             'project = "' + settings.JIRA_ISSUE_DEFAULTS['project'] + '" AND summary ~ "' + issue_title + '"',
-                                                             1)
+        try:
+            existing = self._soap.service.getIssuesFromJqlSearch(self._auth,
+                                                                 'project = "' + settings.JIRA_ISSUE_DEFAULTS['project'] + '" AND summary ~ "' + issue_title + '"',
+                                                                 1)
+        except WebFault as e:
+            # If we've been logged out of JIRA, log back in
+            if e.fault.faultstring == 'com.atlassian.jira.rpc.exception.RemoteAuthenticationException: User not authenticated yet, or session timed out.':
+                self._auth = self._soap.service.login(settings.JIRA_USER, settings.JIRA_PASSWORD)
+                existing = self._soap.service.getIssuesFromJqlSearch(self._auth,
+                                                                     'project = "' + settings.JIRA_ISSUE_DEFAULTS['project'] + '" AND summary ~ "' + issue_title + '"',
+                                                                     1)
+            
+            else:
+                raise
         
         # If it has, add a comment noting that we've had another report of it
         found = False
