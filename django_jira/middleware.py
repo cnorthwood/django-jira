@@ -27,6 +27,7 @@ class JiraExceptionReporterMiddleware:
         try:
             settings.JIRA_ISSUE_DEFAULTS
             settings.JIRA_REOPEN_CLOSED
+            settings.JIRA_WONT_FIX
             
             # Set up SOAP
             self._soap = suds.client.Client(settings.JIRA_URL + 'rpc/soap/jirasoapservice-v2?wsdl')        
@@ -75,7 +76,7 @@ class JiraExceptionReporterMiddleware:
             if issue_title == issue.summary:
             
                 # If this issue is closed, reopen it
-                if issue.status in settings.JIRA_REOPEN_CLOSED:
+                if issue.status in settings.JIRA_REOPEN_CLOSED and issue.resolution != settings.JIRA_WONT_FIX:
                     self._soap.service.progressWorkflowAction(self._auth, issue.key, settings.JIRA_REOPEN_ACTION, ())
                 
                 # Add a comment

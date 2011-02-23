@@ -42,3 +42,6 @@ JIRA_REOPEN_ACTION = The ID of the action to apply in JIRA to reopen an issue
 
 JIRA_REPORT_IN_DEBUG = If set to True, then JIRA will report even if in DEBUG
                        mode, by default it does not.
+
+JIRA_WONT_FIX = The ID of the "Won't Fix" resolution, Django-JIRA won't reopen
+                tickets with this resolution
